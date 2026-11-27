@@ -200,13 +200,26 @@
                     android:orientation="horizontal">
 
                     <TextView
+                        android:id="@+id/txt_list_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="APPS (TAP TO SET CATEGORY)"
+                        android:text="TODAY'S APPS"
                         android:textColor="#94A3B8"
                         android:textSize="11sp"
                         android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_all_apps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_marginRight="6dp"
+                        android:background="#1E2430"
+                        android:paddingLeft="10dp"
+                        android:paddingRight="10dp"
+                        android:text="All Apps"
+                        android:textColor="#F5B942"
+                        android:textSize="11sp" />
 
                     <Button
                         android:id="@+id/btn_blocker_toggle"
@@ -223,7 +236,7 @@
                 <ListView
                     android:id="@+id/list_apps"
                     android:layout_width="match_parent"
-                    android:layout_height="360dp"
+                    android:layout_height="400dp"
                     android:layout_marginTop="8dp"
                     android:divider="#232936"
                     android:dividerHeight="1dp" />

@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -32,13 +33,14 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     ProgressBar goldCircle;
-    TextView txtTotalHours, txtStudyTime, txtNormalTime, txtDistractTime, txtGraphInsight;
+    TextView txtTotalHours, txtStudyTime, txtNormalTime, txtDistractTime, txtGraphInsight, txtListTitle;
     LinearLayout chartContainer;
     ListView listApps;
-    Button btnPermission, btnBlockerToggle;
+    Button btnPermission, btnBlockerToggle, btnAllApps;
 
     SharedPreferences prefs;
     boolean blockerRunning = false;
+    boolean showingAllApps = false;
     List<String> appPackages = new ArrayList<>();
     List<String> appDisplayList = new ArrayList<>();
 
@@ -55,14 +57,29 @@ public class MainActivity extends AppCompatActivity {
         txtNormalTime = findViewById(R.id.txt_normal_time);
         txtDistractTime = findViewById(R.id.txt_distract_time);
         txtGraphInsight = findViewById(R.id.txt_graph_insight);
+        txtListTitle = findViewById(R.id.txt_list_title);
         chartContainer = findViewById(R.id.chart_container);
         listApps = findViewById(R.id.list_apps);
         btnPermission = findViewById(R.id.btn_permission);
         btnBlockerToggle = findViewById(R.id.btn_blocker_toggle);
+        btnAllApps = findViewById(R.id.btn_all_apps);
 
         btnPermission.setOnClickListener(v -> {
             startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
             Toast.makeText(this, "Focus Pro ko Usage Access ON karein", Toast.LENGTH_LONG).show();
+        });
+
+        btnAllApps.setOnClickListener(v -> {
+            showingAllApps = !showingAllApps;
+            if (showingAllApps) {
+                btnAllApps.setText("Today's Usage");
+                txtListTitle.setText("ALL INSTALLED APPS (TAP TO SET)");
+                loadAllInstalledApps();
+            } else {
+                btnAllApps.setText("All Apps");
+                txtListTitle.setText("TODAY'S APPS");
+                loadUsageStats();
+            }
         });
 
         btnBlockerToggle.setOnClickListener(v -> {
@@ -94,7 +111,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        loadUsageStats();
+        if (showingAllApps) {
+            loadAllInstalledApps();
+        } else {
+            loadUsageStats();
+        }
     }
 
     private void showCategoryDialog(String pkg) {
@@ -104,9 +125,39 @@ public class MainActivity extends AppCompatActivity {
                 .setItems(options, (dialog, which) -> {
                     String cat = (which == 0) ? "study" : (which == 1 ? "normal" : "distract");
                     prefs.edit().putString("cat_" + pkg, cat).apply();
-                    loadUsageStats();
+                    if (showingAllApps) {
+                        loadAllInstalledApps();
+                    } else {
+                        loadUsageStats();
+                    }
                 })
                 .show();
+    }
+
+    private void loadAllInstalledApps() {
+        PackageManager pm = getPackageManager();
+        Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+
+        Collections.sort(apps, (a, b) -> a.loadLabel(pm).toString()
+                .compareToIgnoreCase(b.loadLabel(pm).toString()));
+
+        appPackages.clear();
+        appDisplayList.clear();
+
+        for (ResolveInfo info : apps) {
+            String pkg = info.activityInfo.packageName;
+            if (pkg.equals(getPackageName())) continue;
+            String appName = info.loadLabel(pm).toString();
+            String cat = prefs.getString("cat_" + pkg, getDefaultCategory(pkg));
+
+            appPackages.add(pkg);
+            appDisplayList.add(appName + "  [" + cat.toUpperCase() + "]");
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, appDisplayList);
+        listApps.setAdapter(adapter);
     }
 
     private void loadUsageStats() {
@@ -126,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
 
         List<UsageStats> sortedList = new ArrayList<>();
         for (UsageStats us : statsMap.values()) {
-            if (us.getTotalTimeInForeground() > 60000) { // > 1 min
+            if (us.getTotalTimeInForeground() > 60000) {
                 sortedList.add(us);
             }
         }
@@ -157,7 +208,6 @@ public class MainActivity extends AppCompatActivity {
             appDisplayList.add(appName + "  •  " + formatTime(mins) + "  [" + cat.toUpperCase() + "]");
         }
 
-        // Update Gold Circle (Goal: 8 hours = 480 mins)
         int pct = (int) Math.min(100, (studyMins * 100) / 480);
         goldCircle.setProgress(pct);
         txtTotalHours.setText(formatTime(totalMins));
@@ -165,7 +215,6 @@ public class MainActivity extends AppCompatActivity {
         txtNormalTime.setText("Normal: " + formatTime(normalMins));
         txtDistractTime.setText("Distraction: " + formatTime(distractMins));
 
-        // Update Top Apps Bar Chart
         chartContainer.removeAllViews();
         int barCount = Math.min(8, sortedList.size());
         long maxMins = barCount > 0 ? Math.max(1, sortedList.get(0).getTotalTimeInForeground() / 60000) : 1;
